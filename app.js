@@ -1,30 +1,13 @@
 import process from 'process';
 import fs from 'fs';
-import readline from 'node:readline/promises'
-import path from 'path'
-import { stdin as input, stdout as output } from 'process';
+import path from 'path';
 import { Transform } from 'stream';
 
 
-input.setEncoding('utf-8')
+process.stdin.setEncoding('utf-8');
 
-
-const ls = readline.createInterface({ input, output });
-const inPath = await ls.question('write input file path name\n');
-err(inPath);
-const outPath = await ls.question('write output file path name\n');
-const operation = await ls.question('write operation (reverse, uppercase, lowercase)\n');
-ls.close();
-
-
-function err(path) {
-    fs.access(path, (err) => {
-        if (err) {
-            console.log(path, ": don't found");
-            process.exit();
-        }
-    })
-}
+const comandsArr = process.argv.slice(-3);
+const[inPath, outPath, operation] = comandsArr;
 
 function streamFunc(input, output, operation) {
 
@@ -35,7 +18,7 @@ function streamFunc(input, output, operation) {
         console.log(error.message);
         process.exit();
     })
-    
+
     const writeStream = fs.createWriteStream(path.join(process.cwd(), output));
     writeStream.on('open', () => console.log('open'));
     writeStream.on('close', () => console.log('close'));
@@ -44,36 +27,28 @@ function streamFunc(input, output, operation) {
         process.exit();
     })
 
-    const streamRev = new Transform({
-        transform(chunk, encoding, call) {
-            call(null, chunk.toString().trim().split('').reverse().join(''))
+    
+    const transformStream = new Transform({
+        transform(chunk,encoding,call) {
+          let transformedChunk;
+          switch (operation) {
+            case 'uppercase':
+              transformedChunk = chunk.toString().toUpperCase();
+              break;
+            case 'lowercase':
+              transformedChunk = chunk.toString().toLowerCase();
+              break;
+            case 'reverse':
+              transformedChunk = chunk.toString().split('').reverse().join('');
+              break;
+            default:
+              throw new Error('Invalid operation');
+          }
+        call(null,transformedChunk)
         }
-    });
+      });
+      readStream.pipe(transformStream).pipe(writeStream);
 
-    const streamUperCase = new Transform({
-        transform(chunk, encoding, call) {
-            call(null, chunk.toString().trim().toUpperCase());
-        }
-    });
-    const streamLowerCase = new Transform({
-        transform(chunk, encoding, call) {
-            call(null, chunk.toString().trim().toLowerCase());
-        }
-    });
-
-    if (operation === 'reverse') {
-        readStream.pipe(streamRev).pipe(writeStream);
-
-    } else if (operation === 'uppercase') {
-        readStream.pipe(streamUperCase).pipe(writeStream);
-
-    } else if (operation === 'lowercase') {
-        readStream.pipe(streamLowerCase).pipe(writeStream);
-
-    } else {
-        console.log(operation, ': operation is invalid');
-        process.exit();
-    }
 
     process.on('SIGINT', () => {
         writeStream.destroy();
